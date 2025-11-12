@@ -1,11 +1,14 @@
 version: "3.9"
 
 services:
-  # Infra (Run: docker-compose --profile infra up db)
+  # ===============================
+  # Infrastructure Services
+  # ===============================
+
   db:
     image: mysql:8.0
     profiles: ["infra"]
-    command: --default-authentication-plugin=mysql_native_password # Java 21 compat
+    command: --default-authentication-plugin=mysql_native_password # Java 21 compatibility
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: marketgrid_db
@@ -15,7 +18,7 @@ services:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql # Optional: Bootstrap SQL (create empty for now)
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql # Optional: Bootstrap SQL
     healthcheck:
       test:
         [
@@ -34,7 +37,7 @@ services:
     networks:
       - marketgrid-net
 
-  redis: # Stub for carts/inventory (Phase 2)
+  redis:
     image: redis:7-alpine
     profiles: ["infra"]
     ports:
@@ -47,7 +50,10 @@ services:
     networks:
       - marketgrid-net
 
-  # App Services (Run: docker-compose up discovery-server config-server)
+  # ===============================
+  # Core Spring Boot Services
+  # ===============================
+
   discovery-server:
     build:
       context: ../services/discovery-server
@@ -56,15 +62,14 @@ services:
       - "8761:8761"
     environment:
       SPRING_PROFILES_ACTIVE: local
-    user: spring:spring # Matches Dockerfile—non-root
+    user: spring:spring
     depends_on:
       db:
         condition: service_healthy
-        required: false # Optional for now
     networks:
       - marketgrid-net
-    extra_hosts: # If GitHub DNS issues in container
-      - "github.com:140.82.114.3" # Static IP fallback (rare)
+    extra_hosts:
+      - "github.com:140.82.114.3" # Static fallback (rarely needed)
 
   config-server:
     build:
@@ -80,24 +85,10 @@ services:
     user: spring:spring
     depends_on:
       discovery-server:
-        condition: service_healthy # Eureka up before Config registers
+        condition: service_healthy
     networks:
       - marketgrid-net
 
-# Volumes
-volumes:
-  mysql_data:
-    driver: local
-  redis_data:
-    driver: local
-
-# Networks
-networks:
-  marketgrid-net:
-    driver: bridge
-    name: marketgrid_net # Fixed name for external links
-
-  # ... (prior services)
   auth-service:
     build:
       context: ../services/auth-service
@@ -114,3 +105,40 @@ networks:
         condition: service_healthy
     networks:
       - marketgrid-net
+
+  gateway-service:
+    build:
+      context: ../services/gateway-service
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      JWT_SECRET: your-super-secret-key-change-in-prod
+    user: spring:spring
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    networks:
+      - marketgrid-net
+
+# ===============================
+# Volumes
+# ===============================
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+
+# ===============================
+# Networks
+# ===============================
+networks:
+  marketgrid-net:
+    driver: bridge
+    name: marketgrid_net
