@@ -115,6 +115,11 @@
     <modules>  <!-- List children—add as we build -->
         <module>services/discovery-server</module>
         <module>services/config-server</module>
+        <module>services/gateway-service</module>
+        <module>services/auth-service</module>
+
+
+        
         <!-- Later: <module>services/config-server</module>, etc. -->
         <!-- <module>common-lib</module> -->
     </modules>

@@ -96,3 +96,21 @@ networks:
   marketgrid-net:
     driver: bridge
     name: marketgrid_net # Fixed name for external links
+
+  # ... (prior services)
+  auth-service:
+    build:
+      context: ../services/auth-service
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+    user: spring:spring
+    depends_on:
+      db:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    networks:
+      - marketgrid-net
